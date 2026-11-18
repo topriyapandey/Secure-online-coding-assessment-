@@ -62,6 +62,13 @@ namespace CodingAssessment.Api.Data
                 .HasForeignKey(d => d.AssessmentAttemptId)
                 .OnDelete(DeleteBehavior.Cascade);
 
+            // Restrict cascade on DraftCode -> Question to avoid multiple cascade paths
+            builder.Entity<DraftCode>()
+                .HasOne(d => d.Question)
+                .WithMany()
+                .HasForeignKey(d => d.QuestionId)
+                .OnDelete(DeleteBehavior.Restrict);
+
             // Submission relationships
             builder.Entity<Submission>()
                 .HasMany(s => s.TestResults)
