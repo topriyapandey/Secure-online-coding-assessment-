@@ -78,11 +78,36 @@ builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowFrontend", policy =>
     {
-        policy.WithOrigins(
-                "http://localhost:5173",
-                "http://127.0.0.1:5173",
-                "http://localhost:3000",
-                "http://127.0.0.1:3000")
+        var frontendUrl = builder.Configuration["FRONTEND_URL"] ?? builder.Configuration["FrontendUrl"];
+        var origins = new List<string>
+        {
+            "http://localhost:5173",
+            "http://127.0.0.1:5173",
+            "http://localhost:3000",
+            "http://127.0.0.1:3000"
+        };
+        if (!string.IsNullOrEmpty(frontendUrl))
+        {
+            origins.Add(frontendUrl.TrimEnd('/'));
+        }
+
+        policy.WithOrigins(origins.ToArray())
+              .SetIsOriginAllowed(origin =>
+              {
+                  if (string.IsNullOrEmpty(origin)) return false;
+                  try
+                  {
+                      var uri = new Uri(origin);
+                      return uri.Host == "localhost" ||
+                             uri.Host == "127.0.0.1" ||
+                             uri.Host.EndsWith(".vercel.app") ||
+                             (!string.IsNullOrEmpty(frontendUrl) && origin.StartsWith(frontendUrl.TrimEnd('/')));
+                  }
+                  catch
+                  {
+                      return false;
+                  }
+              })
               .AllowAnyHeader()
               .AllowAnyMethod()
               .AllowCredentials();
@@ -148,7 +173,7 @@ using (var scope = app.Services.CreateScope())
 }
 
 // Configure HTTP request pipeline
-if (app.Environment.IsDevelopment())
+if (app.Environment.IsDevelopment() || builder.Configuration.GetValue<bool>("ENABLE_SWAGGER", true))
 {
     app.UseSwagger();
     app.UseSwaggerUI(c =>
