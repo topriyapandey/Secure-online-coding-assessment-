@@ -11,10 +11,17 @@ namespace CodingAssessment.Api.Data
             UserManager<ApplicationUser> userManager,
             RoleManager<IdentityRole> roleManager)
         {
-            // Apply migrations if using relational db
-            if (context.Database.IsRelational())
+            // Apply migrations for SQL Server or ensure schema created for PostgreSQL / others
+            if (context.Database.IsSqlServer())
             {
-                await context.Database.MigrateAsync();
+                try
+                {
+                    await context.Database.MigrateAsync();
+                }
+                catch
+                {
+                    await context.Database.EnsureCreatedAsync();
+                }
             }
             else
             {

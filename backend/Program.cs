@@ -16,10 +16,23 @@ builder.Services.AddControllers();
 
 // Configure Database
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection") 
-    ?? "Server=localhost,1433;Database=CodingAssessmentDb;User Id=sa;Password=Your_password123;TrustServerCertificate=True;MultipleActiveResultSets=true";
+    ?? "Server=(localdb)\\MSSQLLocalDB;Database=CodingAssessmentDb;Trusted_Connection=True;TrustServerCertificate=True;MultipleActiveResultSets=true";
 
-builder.Services.AddDbContext<ApplicationDbContext>(options =>
-    options.UseSqlServer(connectionString));
+bool isPostgres = connectionString.StartsWith("postgres://", StringComparison.OrdinalIgnoreCase) ||
+                  connectionString.StartsWith("postgresql://", StringComparison.OrdinalIgnoreCase) ||
+                  connectionString.Contains("Host=", StringComparison.OrdinalIgnoreCase);
+
+if (isPostgres)
+{
+    var pgConn = ConvertPostgresUriToConnectionString(connectionString);
+    builder.Services.AddDbContext<ApplicationDbContext>(options =>
+        options.UseNpgsql(pgConn));
+}
+else
+{
+    builder.Services.AddDbContext<ApplicationDbContext>(options =>
+        options.UseSqlServer(connectionString));
+}
 
 // Configure Identity
 builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options =>
@@ -190,3 +203,20 @@ app.UseAuthorization();
 app.MapControllers();
 
 app.Run();
+
+static string ConvertPostgresUriToConnectionString(string rawConn)
+{
+    if (rawConn.StartsWith("postgres://", StringComparison.OrdinalIgnoreCase) ||
+        rawConn.StartsWith("postgresql://", StringComparison.OrdinalIgnoreCase))
+    {
+        var uri = new Uri(rawConn);
+        var userInfo = uri.UserInfo.Split(':');
+        var username = Uri.UnescapeDataString(userInfo[0]);
+        var password = userInfo.Length > 1 ? Uri.UnescapeDataString(userInfo[1]) : "";
+        var database = uri.AbsolutePath.TrimStart('/');
+        var port = uri.Port > 0 ? uri.Port : 5432;
+
+        return $"Host={uri.Host};Port={port};Database={database};Username={username};Password={password};SSL Mode=Require;Trust Server Certificate=true;";
+    }
+    return rawConn;
+}
