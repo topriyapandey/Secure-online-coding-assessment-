@@ -195,6 +195,19 @@ if (app.Environment.IsDevelopment() || builder.Configuration.GetValue<bool>("ENA
     });
 }
 
+// Fallback: Rewrite non-prefixed API paths (/auth/... -> /api/auth/...)
+app.Use(async (context, next) =>
+{
+    var path = context.Request.Path.Value ?? "";
+    if (!path.StartsWith("/api", StringComparison.OrdinalIgnoreCase) &&
+        !path.StartsWith("/swagger", StringComparison.OrdinalIgnoreCase) &&
+        !string.IsNullOrEmpty(path) && path != "/")
+    {
+        context.Request.Path = "/api" + path;
+    }
+    await next();
+});
+
 app.UseCors("AllowFrontend");
 
 app.UseAuthentication();
